@@ -1,167 +1,363 @@
 <?php
 
-namespace GuzzleHttp;
+namespace GuzzleHttp\Promise;
 
 /**
- * Debug function used to describe the provided value type and class.
+ * Get the global task queue used for promise resolution.
  *
- * @param mixed $input Any type of variable to describe the type of. This
- *                     parameter misses a typehint because of that.
+ * This task queue MUST be run in an event loop in order for promises to be
+ * settled asynchronously. It will be automatically run when synchronously
+ * waiting on a promise.
  *
- * @return string Returns a string containing the type of the variable and
- *                if a class is provided, the class name.
+ * <code>
+ * while ($eventLoop->isRunning()) {
+ *     GuzzleHttp\Promise\queue()->run();
+ * }
+ * </code>
  *
- * @deprecated describe_type will be removed in guzzlehttp/guzzle:8.0. Use Utils::describeType instead.
+ * @param TaskQueueInterface $assign Optionally specify a new queue instance.
+ *
+ * @return TaskQueueInterface
+ *
+ * @deprecated queue will be removed in guzzlehttp/promises:2.0. Use Utils::queue instead.
  */
-function describe_type($input): string
+function queue(TaskQueueInterface $assign = null)
 {
-    return Utils::describeType($input);
+    return Utils::queue($assign);
 }
 
 /**
- * Parses an array of header lines into an associative array of headers.
+ * Adds a function to run in the task queue when it is next `run()` and returns
+ * a promise that is fulfilled or rejected with the result.
  *
- * @param iterable $lines Header lines array of strings in the following
- *                        format: "Name: Value"
+ * @param callable $task Task function to run.
  *
- * @deprecated headers_from_lines will be removed in guzzlehttp/guzzle:8.0. Use Utils::headersFromLines instead.
+ * @return PromiseInterface
+ *
+ * @deprecated task will be removed in guzzlehttp/promises:2.0. Use Utils::task instead.
  */
-function headers_from_lines(iterable $lines): array
+function task(callable $task)
 {
-    return Utils::headersFromLines($lines);
+    return Utils::task($task);
 }
 
 /**
- * Returns a debug stream based on the provided variable.
+ * Creates a promise for a value if the value is not a promise.
  *
- * @param mixed $value Optional value
+ * @param mixed $value Promise or value.
  *
- * @return resource
+ * @return PromiseInterface
  *
- * @deprecated debug_resource will be removed in guzzlehttp/guzzle:8.0. Use Utils::debugResource instead.
+ * @deprecated promise_for will be removed in guzzlehttp/promises:2.0. Use Create::promiseFor instead.
  */
-function debug_resource($value = null)
+function promise_for($value)
 {
-    return Utils::debugResource($value);
+    return Create::promiseFor($value);
 }
 
 /**
- * Chooses and creates a default handler to use based on the environment.
+ * Creates a rejected promise for a reason if the reason is not a promise. If
+ * the provided reason is a promise, then it is returned as-is.
  *
- * The returned handler is not wrapped by any default middlewares.
+ * @param mixed $reason Promise or reason.
  *
- * @throws \RuntimeException if no viable Handler is available.
+ * @return PromiseInterface
  *
- * @return callable(\Psr\Http\Message\RequestInterface, array): \GuzzleHttp\Promise\PromiseInterface Returns the best handler for the given system.
- *
- * @deprecated choose_handler will be removed in guzzlehttp/guzzle:8.0. Use Utils::chooseHandler instead.
+ * @deprecated rejection_for will be removed in guzzlehttp/promises:2.0. Use Create::rejectionFor instead.
  */
-function choose_handler(): callable
+function rejection_for($reason)
 {
-    return Utils::chooseHandler();
+    return Create::rejectionFor($reason);
 }
 
 /**
- * Get the default User-Agent string to use with Guzzle.
+ * Create an exception for a rejected promise value.
  *
- * @deprecated default_user_agent will be removed in guzzlehttp/guzzle:8.0. Use Utils::defaultUserAgent instead.
+ * @param mixed $reason
+ *
+ * @return \Exception|\Throwable
+ *
+ * @deprecated exception_for will be removed in guzzlehttp/promises:2.0. Use Create::exceptionFor instead.
  */
-function default_user_agent(): string
+function exception_for($reason)
 {
-    return Utils::defaultUserAgent();
+    return Create::exceptionFor($reason);
 }
 
 /**
- * Returns the default cacert bundle for the current system.
+ * Returns an iterator for the given value.
  *
- * First, the openssl.cafile and curl.cainfo php.ini settings are checked.
- * If those settings are not configured, then the common locations for
- * bundles found on Red Hat, CentOS, Fedora, Ubuntu, Debian, FreeBSD, OS X
- * and Windows are checked. If any of these file locations are found on
- * disk, they will be utilized.
+ * @param mixed $value
  *
- * Note: the result of this function is cached for subsequent calls.
+ * @return \Iterator
  *
- * @throws \RuntimeException if no bundle can be found.
- *
- * @deprecated default_ca_bundle will be removed in guzzlehttp/guzzle:8.0. This function is not needed in PHP 5.6+.
+ * @deprecated iter_for will be removed in guzzlehttp/promises:2.0. Use Create::iterFor instead.
  */
-function default_ca_bundle(): string
+function iter_for($value)
 {
-    return Utils::defaultCaBundle();
+    return Create::iterFor($value);
 }
 
 /**
- * Creates an associative array of lowercase header names to the actual
- * header casing.
+ * Synchronously waits on a promise to resolve and returns an inspection state
+ * array.
  *
- * @deprecated normalize_header_keys will be removed in guzzlehttp/guzzle:8.0. Use Utils::normalizeHeaderKeys instead.
+ * Returns a state associative array containing a "state" key mapping to a
+ * valid promise state. If the state of the promise is "fulfilled", the array
+ * will contain a "value" key mapping to the fulfilled value of the promise. If
+ * the promise is rejected, the array will contain a "reason" key mapping to
+ * the rejection reason of the promise.
+ *
+ * @param PromiseInterface $promise Promise or value.
+ *
+ * @return array
+ *
+ * @deprecated inspect will be removed in guzzlehttp/promises:2.0. Use Utils::inspect instead.
  */
-function normalize_header_keys(array $headers): array
+function inspect(PromiseInterface $promise)
 {
-    return Utils::normalizeHeaderKeys($headers);
+    return Utils::inspect($promise);
 }
 
 /**
- * Returns true if the provided host matches any of the no proxy areas.
+ * Waits on all of the provided promises, but does not unwrap rejected promises
+ * as thrown exception.
  *
- * This method will strip a port from the host if it is present. Each pattern
- * can be matched with an exact match (e.g., "foo.com" == "foo.com") or a
- * partial match: (e.g., "foo.com" == "baz.foo.com" and ".foo.com" ==
- * "baz.foo.com", but ".foo.com" != "foo.com").
+ * Returns an array of inspection state arrays.
  *
- * Areas are matched in the following cases:
- * 1. "*" (without quotes) always matches any hosts.
- * 2. An exact match.
- * 3. The area starts with "." and the area is the last part of the host. e.g.
- *    '.mit.edu' will match any host that ends with '.mit.edu'.
+ * @see inspect for the inspection state array format.
  *
- * @param string   $host         Host to check against the patterns.
- * @param string[] $noProxyArray An array of host patterns.
+ * @param PromiseInterface[] $promises Traversable of promises to wait upon.
  *
- * @throws Exception\InvalidArgumentException
+ * @return array
  *
- * @deprecated is_host_in_noproxy will be removed in guzzlehttp/guzzle:8.0. Use Utils::isHostInNoProxy instead.
+ * @deprecated inspect will be removed in guzzlehttp/promises:2.0. Use Utils::inspectAll instead.
  */
-function is_host_in_noproxy(string $host, array $noProxyArray): bool
+function inspect_all($promises)
 {
-    return Utils::isHostInNoProxy($host, $noProxyArray);
+    return Utils::inspectAll($promises);
 }
 
 /**
- * Wrapper for json_decode that throws when an error occurs.
+ * Waits on all of the provided promises and returns the fulfilled values.
  *
- * @param string $json    JSON data to parse
- * @param bool   $assoc   When true, returned objects will be converted
- *                        into associative arrays.
- * @param int    $depth   User specified recursion depth.
- * @param int    $options Bitmask of JSON decode options.
+ * Returns an array that contains the value of each promise (in the same order
+ * the promises were provided). An exception is thrown if any of the promises
+ * are rejected.
  *
- * @return object|array|string|int|float|bool|null
+ * @param iterable<PromiseInterface> $promises Iterable of PromiseInterface objects to wait on.
  *
- * @throws Exception\InvalidArgumentException if the JSON cannot be decoded.
+ * @return array
  *
- * @link https://www.php.net/manual/en/function.json-decode.php
- * @deprecated json_decode will be removed in guzzlehttp/guzzle:8.0. Use Utils::jsonDecode instead.
+ * @throws \Exception on error
+ * @throws \Throwable on error in PHP >=7
+ *
+ * @deprecated unwrap will be removed in guzzlehttp/promises:2.0. Use Utils::unwrap instead.
  */
-function json_decode(string $json, bool $assoc = false, int $depth = 512, int $options = 0)
+function unwrap($promises)
 {
-    return Utils::jsonDecode($json, $assoc, $depth, $options);
+    return Utils::unwrap($promises);
 }
 
 /**
- * Wrapper for JSON encoding that throws when an error occurs.
+ * Given an array of promises, return a promise that is fulfilled when all the
+ * items in the array are fulfilled.
  *
- * @param mixed $value   The value being encoded
- * @param int   $options JSON encode option bitmask
- * @param int   $depth   Set the maximum depth. Must be greater than zero.
+ * The promise's fulfillment value is an array with fulfillment values at
+ * respective positions to the original array. If any promise in the array
+ * rejects, the returned promise is rejected with the rejection reason.
  *
- * @throws Exception\InvalidArgumentException if the JSON cannot be encoded.
+ * @param mixed $promises  Promises or values.
+ * @param bool  $recursive If true, resolves new promises that might have been added to the stack during its own resolution.
  *
- * @link https://www.php.net/manual/en/function.json-encode.php
- * @deprecated json_encode will be removed in guzzlehttp/guzzle:8.0. Use Utils::jsonEncode instead.
+ * @return PromiseInterface
+ *
+ * @deprecated all will be removed in guzzlehttp/promises:2.0. Use Utils::all instead.
  */
-function json_encode($value, int $options = 0, int $depth = 512): string
+function all($promises, $recursive = false)
 {
-    return Utils::jsonEncode($value, $options, $depth);
+    return Utils::all($promises, $recursive);
+}
+
+/**
+ * Initiate a competitive race between multiple promises or values (values will
+ * become immediately fulfilled promises).
+ *
+ * When count amount of promises have been fulfilled, the returned promise is
+ * fulfilled with an array that contains the fulfillment values of the winners
+ * in order of resolution.
+ *
+ * This promise is rejected with a {@see AggregateException} if the number of
+ * fulfilled promises is less than the desired $count.
+ *
+ * @param int   $count    Total number of promises.
+ * @param mixed $promises Promises or values.
+ *
+ * @return PromiseInterface
+ *
+ * @deprecated some will be removed in guzzlehttp/promises:2.0. Use Utils::some instead.
+ */
+function some($count, $promises)
+{
+    return Utils::some($count, $promises);
+}
+
+/**
+ * Like some(), with 1 as count. However, if the promise fulfills, the
+ * fulfillment value is not an array of 1 but the value directly.
+ *
+ * @param mixed $promises Promises or values.
+ *
+ * @return PromiseInterface
+ *
+ * @deprecated any will be removed in guzzlehttp/promises:2.0. Use Utils::any instead.
+ */
+function any($promises)
+{
+    return Utils::any($promises);
+}
+
+/**
+ * Returns a promise that is fulfilled when all of the provided promises have
+ * been fulfilled or rejected.
+ *
+ * The returned promise is fulfilled with an array of inspection state arrays.
+ *
+ * @see inspect for the inspection state array format.
+ *
+ * @param mixed $promises Promises or values.
+ *
+ * @return PromiseInterface
+ *
+ * @deprecated settle will be removed in guzzlehttp/promises:2.0. Use Utils::settle instead.
+ */
+function settle($promises)
+{
+    return Utils::settle($promises);
+}
+
+/**
+ * Given an iterator that yields promises or values, returns a promise that is
+ * fulfilled with a null value when the iterator has been consumed or the
+ * aggregate promise has been fulfilled or rejected.
+ *
+ * $onFulfilled is a function that accepts the fulfilled value, iterator index,
+ * and the aggregate promise. The callback can invoke any necessary side
+ * effects and choose to resolve or reject the aggregate if needed.
+ *
+ * $onRejected is a function that accepts the rejection reason, iterator index,
+ * and the aggregate promise. The callback can invoke any necessary side
+ * effects and choose to resolve or reject the aggregate if needed.
+ *
+ * @param mixed    $iterable    Iterator or array to iterate over.
+ * @param callable $onFulfilled
+ * @param callable $onRejected
+ *
+ * @return PromiseInterface
+ *
+ * @deprecated each will be removed in guzzlehttp/promises:2.0. Use Each::of instead.
+ */
+function each(
+    $iterable,
+    callable $onFulfilled = null,
+    callable $onRejected = null
+) {
+    return Each::of($iterable, $onFulfilled, $onRejected);
+}
+
+/**
+ * Like each, but only allows a certain number of outstanding promises at any
+ * given time.
+ *
+ * $concurrency may be an integer or a function that accepts the number of
+ * pending promises and returns a numeric concurrency limit value to allow for
+ * dynamic a concurrency size.
+ *
+ * @param mixed        $iterable
+ * @param int|callable $concurrency
+ * @param callable     $onFulfilled
+ * @param callable     $onRejected
+ *
+ * @return PromiseInterface
+ *
+ * @deprecated each_limit will be removed in guzzlehttp/promises:2.0. Use Each::ofLimit instead.
+ */
+function each_limit(
+    $iterable,
+    $concurrency,
+    callable $onFulfilled = null,
+    callable $onRejected = null
+) {
+    return Each::ofLimit($iterable, $concurrency, $onFulfilled, $onRejected);
+}
+
+/**
+ * Like each_limit, but ensures that no promise in the given $iterable argument
+ * is rejected. If any promise is rejected, then the aggregate promise is
+ * rejected with the encountered rejection.
+ *
+ * @param mixed        $iterable
+ * @param int|callable $concurrency
+ * @param callable     $onFulfilled
+ *
+ * @return PromiseInterface
+ *
+ * @deprecated each_limit_all will be removed in guzzlehttp/promises:2.0. Use Each::ofLimitAll instead.
+ */
+function each_limit_all(
+    $iterable,
+    $concurrency,
+    callable $onFulfilled = null
+) {
+    return Each::ofLimitAll($iterable, $concurrency, $onFulfilled);
+}
+
+/**
+ * Returns true if a promise is fulfilled.
+ *
+ * @return bool
+ *
+ * @deprecated is_fulfilled will be removed in guzzlehttp/promises:2.0. Use Is::fulfilled instead.
+ */
+function is_fulfilled(PromiseInterface $promise)
+{
+    return Is::fulfilled($promise);
+}
+
+/**
+ * Returns true if a promise is rejected.
+ *
+ * @return bool
+ *
+ * @deprecated is_rejected will be removed in guzzlehttp/promises:2.0. Use Is::rejected instead.
+ */
+function is_rejected(PromiseInterface $promise)
+{
+    return Is::rejected($promise);
+}
+
+/**
+ * Returns true if a promise is fulfilled or rejected.
+ *
+ * @return bool
+ *
+ * @deprecated is_settled will be removed in guzzlehttp/promises:2.0. Use Is::settled instead.
+ */
+function is_settled(PromiseInterface $promise)
+{
+    return Is::settled($promise);
+}
+
+/**
+ * Create a new coroutine.
+ *
+ * @see Coroutine
+ *
+ * @return PromiseInterface
+ *
+ * @deprecated coroutine will be removed in guzzlehttp/promises:2.0. Use Coroutine::of instead.
+ */
+function coroutine(callable $generatorFn)
+{
+    return Coroutine::of($generatorFn);
 }
