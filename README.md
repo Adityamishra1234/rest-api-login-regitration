@@ -1,547 +1,488 @@
-# Guzzle Promises
+This is the PHP port of Hamcrest Matchers
+=========================================
 
-[Promises/A+](https://promisesaplus.com/) implementation that handles promise
-chaining and resolution iteratively, allowing for "infinite" promise chaining
-while keeping the stack size constant. Read [this blog post](https://blog.domenic.me/youre-missing-the-point-of-promises/)
-for a general introduction to promises.
+[![Build Status](https://travis-ci.org/hamcrest/hamcrest-php.png?branch=master)](https://travis-ci.org/hamcrest/hamcrest-php)
 
-- [Features](#features)
-- [Quick start](#quick-start)
-- [Synchronous wait](#synchronous-wait)
-- [Cancellation](#cancellation)
-- [API](#api)
-  - [Promise](#promise)
-  - [FulfilledPromise](#fulfilledpromise)
-  - [RejectedPromise](#rejectedpromise)
-- [Promise interop](#promise-interop)
-- [Implementation notes](#implementation-notes)
+Hamcrest is a matching library originally written for Java, but
+subsequently ported to many other languages.  hamcrest-php is the
+official PHP port of Hamcrest and essentially follows a literal
+translation of the original Java API for Hamcrest, with a few
+Exceptions, mostly down to PHP language barriers:
+
+  1. `instanceOf($theClass)` is actually `anInstanceOf($theClass)`
+
+  2. `both(containsString('a'))->and(containsString('b'))`
+     is actually `both(containsString('a'))->andAlso(containsString('b'))`
+
+  3. `either(containsString('a'))->or(containsString('b'))`
+     is actually `either(containsString('a'))->orElse(containsString('b'))`
+
+  4. Unless it would be non-semantic for a matcher to do so, hamcrest-php
+     allows dynamic typing for it's input, in "the PHP way". Exception are
+     where semantics surrounding the type itself would suggest otherwise,
+     such as stringContains() and greaterThan().
+
+  5. Several official matchers have not been ported because they don't
+     make sense or don't apply in PHP:
+
+       - `typeCompatibleWith($theClass)`
+       - `eventFrom($source)`
+       - `hasProperty($name)` **
+       - `samePropertyValuesAs($obj)` **
+
+  6. When most of the collections matchers are finally ported, PHP-specific
+     aliases will probably be created due to a difference in naming
+     conventions between Java's Arrays, Collections, Sets and Maps compared
+     with PHP's Arrays.
+
+---
+** [Unless we consider POPO's (Plain Old PHP Objects) akin to JavaBeans]
+     - The POPO thing is a joke.  Java devs coin the term POJO's (Plain Old
+       Java Objects).
 
 
-# Features
+Usage
+-----
 
-- [Promises/A+](https://promisesaplus.com/) implementation.
-- Promise resolution and chaining is handled iteratively, allowing for
-  "infinite" promise chaining.
-- Promises have a synchronous `wait` method.
-- Promises can be cancelled.
-- Works with any object that has a `then` function.
-- C# style async/await coroutine promises using
-  `GuzzleHttp\Promise\Coroutine::of()`.
-
-
-# Quick start
-
-A *promise* represents the eventual result of an asynchronous operation. The
-primary way of interacting with a promise is through its `then` method, which
-registers callbacks to receive either a promise's eventual value or the reason
-why the promise cannot be fulfilled.
-
-
-## Callbacks
-
-Callbacks are registered with the `then` method by providing an optional 
-`$onFulfilled` followed by an optional `$onRejected` function.
-
+Hamcrest matchers are easy to use as:
 
 ```php
-use GuzzleHttp\Promise\Promise;
+Hamcrest_MatcherAssert::assertThat('a', Hamcrest_Matchers::equalToIgnoringCase('A'));
+```
 
-$promise = new Promise();
-$promise->then(
-    // $onFulfilled
-    function ($value) {
-        echo 'The promise was fulfilled.';
-    },
-    // $onRejected
-    function ($reason) {
-        echo 'The promise was rejected.';
+Alternatively, you can use the global proxy-functions:
+
+```php
+$result = true;
+// with an identifier
+assertThat("result should be true", $result, equalTo(true));
+
+// without an identifier
+assertThat($result, equalTo(true));
+
+// evaluate a boolean expression
+assertThat($result === true);
+
+// with syntactic sugar is()
+assertThat(true, is(true));
+```
+
+:warning: **NOTE:** the global proxy-functions aren't autoloaded by default, so you will need to load them first:
+
+```php
+\Hamcrest\Util::registerGlobalFunctions();
+```
+
+For brevity, all of the examples below use the proxy-functions.
+
+
+Documentation
+-------------
+A tutorial can be found on the [Hamcrest site](https://code.google.com/archive/p/hamcrest/wikis/TutorialPHP.wiki).
+
+
+Available Matchers
+------------------
+* [Array](../master/README.md#array)
+* [Collection](../master/README.md#collection)
+* [Object](../master/README.md#object)
+* [Numbers](../master/README.md#numbers)
+* [Type checking](../master/README.md#type-checking)
+* [XML](../master/README.md#xml)
+
+
+### Array
+
+* `anArray` - evaluates an array
+```php
+assertThat([], anArray());
+```
+
+* `hasItemInArray` - check if item exists in array
+```php
+$list = range(2, 7, 2);
+$item = 4;
+assertThat($list, hasItemInArray($item));
+```
+
+* `hasValue` - alias of hasItemInArray
+
+* `arrayContainingInAnyOrder` - check if array contains elements in any order
+```php
+assertThat([2, 4, 6], arrayContainingInAnyOrder([6, 4, 2]));
+assertThat([2, 4, 6], arrayContainingInAnyOrder([4, 2, 6]));
+```
+
+* `containsInAnyOrder` - alias of arrayContainingInAnyOrder
+
+* `arrayContaining` - An array with elements that match the given matchers in the same order.
+```php
+assertThat([2, 4, 6], arrayContaining([2, 4, 6]));
+assertthat([2, 4, 6], not(arrayContaining([6, 4, 2])));
+```
+
+* `contains` - check array in same order
+```php
+assertThat([2, 4, 6], contains([2, 4, 6]));
+```
+
+* `hasKeyInArray` - check if array has given key
+```php
+assertThat(['name'=> 'foobar'], hasKeyInArray('name'));
+```
+
+* `hasKey` - alias of hasKeyInArray
+
+* `hasKeyValuePair` - check if arary has given key, value pair
+```php
+assertThat(['name'=> 'foobar'], hasKeyValuePair('name', 'foobar'));
+```
+* `hasEntry` - same as hasKeyValuePair
+
+* `arrayWithSize` - check array has given size
+```php
+assertthat([2, 4, 6], arrayWithSize(3));
+```
+* `emptyArray` - check if array is emtpy
+```php
+assertThat([], emptyArray());
+```
+
+* `nonEmptyArray`
+```php
+assertThat([1], nonEmptyArray());
+```
+
+### Collection
+
+* `emptyTraversable` - check if traversable is empty
+```php
+$empty_it = new EmptyIterator;
+assertThat($empty_it, emptyTraversable());
+```
+
+* `nonEmptyTraversable` - check if traversable isn't empty
+```php
+$non_empty_it = new ArrayIterator(range(1, 10));
+assertThat($non_empty_it, nonEmptyTraversable());
+a
+```
+
+* `traversableWithSize`
+```php
+$non_empty_it = new ArrayIterator(range(1, 10));
+assertThat($non_empty_it, traversableWithSize(count(range(1, 10))));
+`
+```
+
+### Core
+
+* `allOf` - Evaluates to true only if ALL of the passed in matchers evaluate to true.
+```php
+assertThat([2,4,6], allOf(hasValue(2), arrayWithSize(3)));
+```
+
+* `anyOf` - Evaluates to true if ANY of the passed in matchers evaluate to true.
+```php
+assertThat([2, 4, 6], anyOf(hasValue(8), hasValue(2)));
+```
+
+* `noneOf` - Evaluates to false if ANY of the passed in matchers evaluate to true.
+```php
+assertThat([2, 4, 6], noneOf(hasValue(1), hasValue(3)));
+```
+
+* `both` + `andAlso` - This is useful for fluently combining matchers that must both pass.
+```php
+assertThat([2, 4, 6], both(hasValue(2))->andAlso(hasValue(4)));
+```
+
+* `either` + `orElse` - This is useful for fluently combining matchers where either may pass,
+```php
+assertThat([2, 4, 6], either(hasValue(2))->orElse(hasValue(4)));
+```
+
+* `describedAs` - Wraps an existing matcher and overrides the description when it fails.
+```php 
+$expected = "Dog";
+$found = null;
+// this assertion would result error message as Expected: is not null but: was null
+//assertThat("Expected {$expected}, got {$found}", $found, is(notNullValue()));
+// and this assertion would result error message as Expected: Dog but: was null
+//assertThat($found, describedAs($expected, notNullValue()));
+```
+
+* `everyItem` - A matcher to apply to every element in an array.
+```php
+assertThat([2, 4, 6], everyItem(notNullValue()));
+```
+
+* `hasItem` - check array has given item, it can take a matcher argument
+```php
+assertThat([2, 4, 6], hasItem(equalTo(2)));
+```
+
+* `hasItems` - check array has givem items, it can take multiple matcher as arguments
+```php
+assertThat([1, 3, 5], hasItems(equalTo(1), equalTo(3)));
+```
+
+### Object
+
+* `hasToString` - check `__toString` or `toString` method
+```php
+class Foo {
+    public $name = null;
+
+    public function __toString() {
+        return "[Foo]Instance";
     }
-);
-```
-
-*Resolving* a promise means that you either fulfill a promise with a *value* or
-reject a promise with a *reason*. Resolving a promises triggers callbacks
-registered with the promises's `then` method. These callbacks are triggered
-only once and in the order in which they were added.
-
-
-## Resolving a promise
-
-Promises are fulfilled using the `resolve($value)` method. Resolving a promise
-with any value other than a `GuzzleHttp\Promise\RejectedPromise` will trigger
-all of the onFulfilled callbacks (resolving a promise with a rejected promise
-will reject the promise and trigger the `$onRejected` callbacks).
-
-```php
-use GuzzleHttp\Promise\Promise;
-
-$promise = new Promise();
-$promise
-    ->then(function ($value) {
-        // Return a value and don't break the chain
-        return "Hello, " . $value;
-    })
-    // This then is executed after the first then and receives the value
-    // returned from the first then.
-    ->then(function ($value) {
-        echo $value;
-    });
-
-// Resolving the promise triggers the $onFulfilled callbacks and outputs
-// "Hello, reader."
-$promise->resolve('reader.');
-```
-
-
-## Promise forwarding
-
-Promises can be chained one after the other. Each then in the chain is a new
-promise. The return value of a promise is what's forwarded to the next
-promise in the chain. Returning a promise in a `then` callback will cause the
-subsequent promises in the chain to only be fulfilled when the returned promise
-has been fulfilled. The next promise in the chain will be invoked with the
-resolved value of the promise.
-
-```php
-use GuzzleHttp\Promise\Promise;
-
-$promise = new Promise();
-$nextPromise = new Promise();
-
-$promise
-    ->then(function ($value) use ($nextPromise) {
-        echo $value;
-        return $nextPromise;
-    })
-    ->then(function ($value) {
-        echo $value;
-    });
-
-// Triggers the first callback and outputs "A"
-$promise->resolve('A');
-// Triggers the second callback and outputs "B"
-$nextPromise->resolve('B');
-```
-
-## Promise rejection
-
-When a promise is rejected, the `$onRejected` callbacks are invoked with the
-rejection reason.
-
-```php
-use GuzzleHttp\Promise\Promise;
-
-$promise = new Promise();
-$promise->then(null, function ($reason) {
-    echo $reason;
-});
-
-$promise->reject('Error!');
-// Outputs "Error!"
-```
-
-## Rejection forwarding
-
-If an exception is thrown in an `$onRejected` callback, subsequent
-`$onRejected` callbacks are invoked with the thrown exception as the reason.
-
-```php
-use GuzzleHttp\Promise\Promise;
-
-$promise = new Promise();
-$promise->then(null, function ($reason) {
-    throw new Exception($reason);
-})->then(null, function ($reason) {
-    assert($reason->getMessage() === 'Error!');
-});
-
-$promise->reject('Error!');
-```
-
-You can also forward a rejection down the promise chain by returning a
-`GuzzleHttp\Promise\RejectedPromise` in either an `$onFulfilled` or
-`$onRejected` callback.
-
-```php
-use GuzzleHttp\Promise\Promise;
-use GuzzleHttp\Promise\RejectedPromise;
-
-$promise = new Promise();
-$promise->then(null, function ($reason) {
-    return new RejectedPromise($reason);
-})->then(null, function ($reason) {
-    assert($reason === 'Error!');
-});
-
-$promise->reject('Error!');
-```
-
-If an exception is not thrown in a `$onRejected` callback and the callback
-does not return a rejected promise, downstream `$onFulfilled` callbacks are
-invoked using the value returned from the `$onRejected` callback.
-
-```php
-use GuzzleHttp\Promise\Promise;
-
-$promise = new Promise();
-$promise
-    ->then(null, function ($reason) {
-        return "It's ok";
-    })
-    ->then(function ($value) {
-        assert($value === "It's ok");
-    });
-
-$promise->reject('Error!');
-```
-
-# Synchronous wait
-
-You can synchronously force promises to complete using a promise's `wait`
-method. When creating a promise, you can provide a wait function that is used
-to synchronously force a promise to complete. When a wait function is invoked
-it is expected to deliver a value to the promise or reject the promise. If the
-wait function does not deliver a value, then an exception is thrown. The wait
-function provided to a promise constructor is invoked when the `wait` function
-of the promise is called.
-
-```php
-$promise = new Promise(function () use (&$promise) {
-    $promise->resolve('foo');
-});
-
-// Calling wait will return the value of the promise.
-echo $promise->wait(); // outputs "foo"
-```
-
-If an exception is encountered while invoking the wait function of a promise,
-the promise is rejected with the exception and the exception is thrown.
-
-```php
-$promise = new Promise(function () use (&$promise) {
-    throw new Exception('foo');
-});
-
-$promise->wait(); // throws the exception.
-```
-
-Calling `wait` on a promise that has been fulfilled will not trigger the wait
-function. It will simply return the previously resolved value.
-
-```php
-$promise = new Promise(function () { die('this is not called!'); });
-$promise->resolve('foo');
-echo $promise->wait(); // outputs "foo"
-```
-
-Calling `wait` on a promise that has been rejected will throw an exception. If
-the rejection reason is an instance of `\Exception` the reason is thrown.
-Otherwise, a `GuzzleHttp\Promise\RejectionException` is thrown and the reason
-can be obtained by calling the `getReason` method of the exception.
-
-```php
-$promise = new Promise();
-$promise->reject('foo');
-$promise->wait();
-```
-
-> PHP Fatal error:  Uncaught exception 'GuzzleHttp\Promise\RejectionException' with message 'The promise was rejected with value: foo'
-
-
-## Unwrapping a promise
-
-When synchronously waiting on a promise, you are joining the state of the
-promise into the current state of execution (i.e., return the value of the
-promise if it was fulfilled or throw an exception if it was rejected). This is
-called "unwrapping" the promise. Waiting on a promise will by default unwrap
-the promise state.
-
-You can force a promise to resolve and *not* unwrap the state of the promise
-by passing `false` to the first argument of the `wait` function:
-
-```php
-$promise = new Promise();
-$promise->reject('foo');
-// This will not throw an exception. It simply ensures the promise has
-// been resolved.
-$promise->wait(false);
-```
-
-When unwrapping a promise, the resolved value of the promise will be waited
-upon until the unwrapped value is not a promise. This means that if you resolve
-promise A with a promise B and unwrap promise A, the value returned by the
-wait function will be the value delivered to promise B.
-
-**Note**: when you do not unwrap the promise, no value is returned.
-
-
-# Cancellation
-
-You can cancel a promise that has not yet been fulfilled using the `cancel()`
-method of a promise. When creating a promise you can provide an optional
-cancel function that when invoked cancels the action of computing a resolution
-of the promise.
-
-
-# API
-
-
-## Promise
-
-When creating a promise object, you can provide an optional `$waitFn` and
-`$cancelFn`. `$waitFn` is a function that is invoked with no arguments and is
-expected to resolve the promise. `$cancelFn` is a function with no arguments
-that is expected to cancel the computation of a promise. It is invoked when the
-`cancel()` method of a promise is called.
-
-```php
-use GuzzleHttp\Promise\Promise;
-
-$promise = new Promise(
-    function () use (&$promise) {
-        $promise->resolve('waited');
-    },
-    function () {
-        // do something that will cancel the promise computation (e.g., close
-        // a socket, cancel a database query, etc...)
-    }
-);
-
-assert('waited' === $promise->wait());
-```
-
-A promise has the following methods:
-
-- `then(callable $onFulfilled, callable $onRejected) : PromiseInterface`
-  
-  Appends fulfillment and rejection handlers to the promise, and returns a new promise resolving to the return value of the called handler.
-
-- `otherwise(callable $onRejected) : PromiseInterface`
-  
-  Appends a rejection handler callback to the promise, and returns a new promise resolving to the return value of the callback if it is called, or to its original fulfillment value if the promise is instead fulfilled.
-
-- `wait($unwrap = true) : mixed`
-
-  Synchronously waits on the promise to complete.
-  
-  `$unwrap` controls whether or not the value of the promise is returned for a
-  fulfilled promise or if an exception is thrown if the promise is rejected.
-  This is set to `true` by default.
-
-- `cancel()`
-
-  Attempts to cancel the promise if possible. The promise being cancelled and
-  the parent most ancestor that has not yet been resolved will also be
-  cancelled. Any promises waiting on the cancelled promise to resolve will also
-  be cancelled.
-
-- `getState() : string`
-
-  Returns the state of the promise. One of `pending`, `fulfilled`, or
-  `rejected`.
-
-- `resolve($value)`
-
-  Fulfills the promise with the given `$value`.
-
-- `reject($reason)`
-
-  Rejects the promise with the given `$reason`.
-
-
-## FulfilledPromise
-
-A fulfilled promise can be created to represent a promise that has been
-fulfilled.
-
-```php
-use GuzzleHttp\Promise\FulfilledPromise;
-
-$promise = new FulfilledPromise('value');
-
-// Fulfilled callbacks are immediately invoked.
-$promise->then(function ($value) {
-    echo $value;
-});
-```
-
-
-## RejectedPromise
-
-A rejected promise can be created to represent a promise that has been
-rejected.
-
-```php
-use GuzzleHttp\Promise\RejectedPromise;
-
-$promise = new RejectedPromise('Error');
-
-// Rejected callbacks are immediately invoked.
-$promise->then(null, function ($reason) {
-    echo $reason;
-});
-```
-
-
-# Promise interop
-
-This library works with foreign promises that have a `then` method. This means
-you can use Guzzle promises with [React promises](https://github.com/reactphp/promise)
-for example. When a foreign promise is returned inside of a then method
-callback, promise resolution will occur recursively.
-
-```php
-// Create a React promise
-$deferred = new React\Promise\Deferred();
-$reactPromise = $deferred->promise();
-
-// Create a Guzzle promise that is fulfilled with a React promise.
-$guzzlePromise = new GuzzleHttp\Promise\Promise();
-$guzzlePromise->then(function ($value) use ($reactPromise) {
-    // Do something something with the value...
-    // Return the React promise
-    return $reactPromise;
-});
-```
-
-Please note that wait and cancel chaining is no longer possible when forwarding
-a foreign promise. You will need to wrap a third-party promise with a Guzzle
-promise in order to utilize wait and cancel functions with foreign promises.
-
-
-## Event Loop Integration
-
-In order to keep the stack size constant, Guzzle promises are resolved
-asynchronously using a task queue. When waiting on promises synchronously, the
-task queue will be automatically run to ensure that the blocking promise and
-any forwarded promises are resolved. When using promises asynchronously in an
-event loop, you will need to run the task queue on each tick of the loop. If
-you do not run the task queue, then promises will not be resolved.
-
-You can run the task queue using the `run()` method of the global task queue
-instance.
-
-```php
-// Get the global task queue
-$queue = GuzzleHttp\Promise\Utils::queue();
-$queue->run();
-```
-
-For example, you could use Guzzle promises with React using a periodic timer:
-
-```php
-$loop = React\EventLoop\Factory::create();
-$loop->addPeriodicTimer(0, [$queue, 'run']);
-```
-
-*TODO*: Perhaps adding a `futureTick()` on each tick would be faster?
-
-
-# Implementation notes
-
-
-## Promise resolution and chaining is handled iteratively
-
-By shuffling pending handlers from one owner to another, promises are
-resolved iteratively, allowing for "infinite" then chaining.
-
-```php
-<?php
-require 'vendor/autoload.php';
-
-use GuzzleHttp\Promise\Promise;
-
-$parent = new Promise();
-$p = $parent;
-
-for ($i = 0; $i < 1000; $i++) {
-    $p = $p->then(function ($v) {
-        // The stack size remains constant (a good thing)
-        echo xdebug_get_stack_depth() . ', ';
-        return $v + 1;
-    });
 }
-
-$parent->resolve(0);
-var_dump($p->wait()); // int(1000)
-
+$foo = new Foo;
+assertThat($foo, hasToString(equalTo("[Foo]Instance")));
 ```
 
-When a promise is fulfilled or rejected with a non-promise value, the promise
-then takes ownership of the handlers of each child promise and delivers values
-down the chain without using recursion.
-
-When a promise is resolved with another promise, the original promise transfers
-all of its pending handlers to the new promise. When the new promise is
-eventually resolved, all of the pending handlers are delivered the forwarded
-value.
-
-
-## A promise is the deferred.
-
-Some promise libraries implement promises using a deferred object to represent
-a computation and a promise object to represent the delivery of the result of
-the computation. This is a nice separation of computation and delivery because
-consumers of the promise cannot modify the value that will be eventually
-delivered.
-
-One side effect of being able to implement promise resolution and chaining
-iteratively is that you need to be able for one promise to reach into the state
-of another promise to shuffle around ownership of handlers. In order to achieve
-this without making the handlers of a promise publicly mutable, a promise is
-also the deferred value, allowing promises of the same parent class to reach
-into and modify the private properties of promises of the same type. While this
-does allow consumers of the value to modify the resolution or rejection of the
-deferred, it is a small price to pay for keeping the stack size constant.
-
+* `equalTo` - compares two instances using comparison operator '=='
 ```php
-$promise = new Promise();
-$promise->then(function ($value) { echo $value; });
-// The promise is the deferred value, so you can deliver a value to it.
-$promise->resolve('foo');
-// prints "foo"
+$foo = new Foo;
+$foo2 = new Foo;
+assertThat($foo, equalTo($foo2));
 ```
 
+* `identicalTo` - compares two instances using identity operator '==='
+```php
+assertThat($foo, is(not(identicalTo($foo2))));
+```
 
-## Upgrading from Function API
+* `anInstanceOf` - check instance is an instance|sub-class of given class
+```php
+assertThat($foo, anInstanceOf(Foo::class));
+```
 
-A static API was first introduced in 1.4.0, in order to mitigate problems with functions conflicting between global and local copies of the package. The function API will be removed in 2.0.0. A migration table has been provided here for your convenience:
+* `any` - alias of `anInstanceOf`
 
-| Original Function | Replacement Method |
-|----------------|----------------|
-| `queue` | `Utils::queue` |
-| `task` | `Utils::task` |
-| `promise_for` | `Create::promiseFor` |
-| `rejection_for` | `Create::rejectionFor` |
-| `exception_for` | `Create::exceptionFor` |
-| `iter_for` | `Create::iterFor` |
-| `inspect` | `Utils::inspect` |
-| `inspect_all` | `Utils::inspectAll` |
-| `unwrap` | `Utils::unwrap` |
-| `all` | `Utils::all` |
-| `some` | `Utils::some` |
-| `any` | `Utils::any` |
-| `settle` | `Utils::settle` |
-| `each` | `Each::of` |
-| `each_limit` | `Each::ofLimit` |
-| `each_limit_all` | `Each::ofLimitAll` |
-| `!is_fulfilled` | `Is::pending` |
-| `is_fulfilled` | `Is::fulfilled` |
-| `is_rejected` | `Is::rejected` |
-| `is_settled` | `Is::settled` |
-| `coroutine` | `Coroutine::of` |
+* `nullValue` check null
+```php
+assertThat(null, is(nullValue()));
+```
 
+* `notNullValue` check not null
+```php
+assertThat("", notNullValue());
+```
 
-## Security
+* `sameInstance` - check for same instance
+```php
+assertThat($foo, is(not(sameInstance($foo2))));
+assertThat($foo, is(sameInstance($foo)));
+```
 
-If you discover a security vulnerability within this package, please send an email to security@tidelift.com. All security vulnerabilities will be promptly addressed. Please do not disclose security-related issues publicly until a fix has been announced. Please see [Security Policy](https://github.com/guzzle/promises/security/policy) for more information.
+* `typeOf`- check type
+```php 
+assertThat(1, typeOf("integer"));
+```
 
-## License
+* `notSet` - check if instance property is not set
+```php
+assertThat($foo, notSet("name"));
+```
 
-Guzzle is made available under the MIT License (MIT). Please see [License File](LICENSE) for more information.
+* `set` - check if instance property is set
+```php
+$foo->name = "bar";
+assertThat($foo, set("name"));
+```
 
-## For Enterprise
+### Numbers
 
-Available as part of the Tidelift Subscription
+* `closeTo` - check value close to a range
+```php
+assertThat(3, closeTo(3, 0.5));
+```
 
-The maintainers of Guzzle and thousands of other packages are working with Tidelift to deliver commercial support and maintenance for the open source dependencies you use to build your applications. Save time, reduce risk, and improve code health, while paying the maintainers of the exact dependencies you use. [Learn more.](https://tidelift.com/subscription/pkg/packagist-guzzlehttp-promises?utm_source=packagist-guzzlehttp-promises&utm_medium=referral&utm_campaign=enterprise&utm_term=repo)
+* `comparesEqualTo` - check with '=='
+```php
+assertThat(2, comparesEqualTo(2));
+```
+
+* `greaterThan` - check '>'
+```
+assertThat(2, greaterThan(1));
+```
+
+* `greaterThanOrEqualTo`
+```php
+assertThat(2, greaterThanOrEqualTo(2));
+```
+
+* `atLeast` - The value is >= given value
+```php
+assertThat(3, atLeast(2));
+```
+* `lessThan`
+```php
+assertThat(2, lessThan(3));
+```
+
+* `lessThanOrEqualTo`
+```php
+assertThat(2, lessThanOrEqualTo(3));
+```
+
+* `atMost` - The value is <= given value
+```php
+assertThat(2, atMost(3));
+```
+
+### String
+
+* `emptyString` - check for empty string
+```php
+assertThat("", emptyString());
+```
+
+* `isEmptyOrNullString`
+```php
+assertThat(null, isEmptyOrNullString());
+```
+
+* `nullOrEmptyString`
+```php
+assertThat("", nullOrEmptyString());
+```
+
+* `isNonEmptyString`
+```php
+assertThat("foo", isNonEmptyString());
+```
+
+* `nonEmptyString`
+```php
+assertThat("foo", nonEmptyString());
+```
+
+* `equalToIgnoringCase`
+```php
+assertThat("Foo", equalToIgnoringCase("foo"));
+```
+* `equalToIgnoringWhiteSpace`
+```php
+assertThat(" Foo ", equalToIgnoringWhiteSpace("Foo"));
+```
+
+* `matchesPattern` - matches with regex pattern
+```php
+assertThat("foobarbaz", matchesPattern('/(foo)(bar)(baz)/'));
+```
+
+* `containsString` - check for substring
+```php
+assertThat("foobar", containsString("foo"));
+```
+
+* `containsStringIgnoringCase`
+```php
+assertThat("fooBar", containsStringIgnoringCase("bar"));
+```
+
+* `stringContainsInOrder`
+```php
+assertThat("foo", stringContainsInOrder("foo"));
+```
+
+* `endsWith` - check string that ends with given value
+```php
+assertThat("foo", endsWith("oo"));
+```
+
+* `startsWith` - check string that starts with given value
+```php
+assertThat("bar", startsWith("ba"));
+```
+
+### Type-checking
+
+* `arrayValue` - check array type
+```php
+assertThat([], arrayValue());
+```
+
+* `booleanValue`
+```php
+assertThat(true, booleanValue());
+```
+* `boolValue` - alias of booleanValue
+
+* `callableValue` - check if value is callable
+```php
+$func = function () {};
+assertThat($func, callableValue());
+```
+* `doubleValue`
+```php
+assertThat(3.14, doubleValue());
+```
+
+* `floatValue`
+```php
+assertThat(3.14, floatValue());
+```
+
+* `integerValue`
+```php
+assertThat(1, integerValue());
+```
+
+* `intValue` - alias of `integerValue`
+
+* `numericValue` - check if value is numeric
+```php
+assertThat("123", numericValue());
+```
+
+* `objectValue` - check for object
+```php
+$obj = new stdClass;
+assertThat($obj, objectValue());
+```
+* `anObject`
+```php
+assertThat($obj, anObject());
+```
+
+* `resourceValue` - check resource type
+```php
+$fp = fopen("/tmp/foo", "w+");
+assertThat($fp, resourceValue());
+```
+
+* `scalarValue` - check for scaler value
+```php
+assertThat(1, scalarValue());
+```
+
+* `stringValue`
+```php
+assertThat("", stringValue());
+```
+
+### XML
+
+* `hasXPath` - check xml with a xpath
+```php
+$xml = <<<XML
+<books>
+  <book>
+    <isbn>1</isbn>   
+  </book>
+  <book>
+    <isbn>2</isbn>   
+  </book>
+</books>
+XML;
+
+$doc = new DOMDocument;
+$doc->loadXML($xml);
+assertThat($doc, hasXPath("book", 2));
+```
+
